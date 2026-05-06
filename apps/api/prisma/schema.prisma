@@ -1,0 +1,93 @@
+// HomeStock — Prisma Schema
+// PostgreSQL via Supabase pooled connection.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Member {
+  id                  String        @id @default(cuid())
+  name                String
+  avatarUrl           String?
+  weeklyPresenceHours Float         @default(0)
+  routineSlots        RoutineSlot[]
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+}
+
+model RoutineSlot {
+  id        String @id @default(cuid())
+  member    Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  memberId  String
+  dayOfWeek Int
+  startTime String
+  endTime   String
+
+  @@index([memberId])
+}
+
+model Category {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  icon     String
+  products Product[]
+}
+
+model Product {
+  id                      String          @id @default(cuid())
+  name                    String
+  brand                   String?
+  category                Category        @relation(fields: [categoryId], references: [id])
+  categoryId              String
+  unit                    String
+  packageSize             Float
+  currentQuantity         Float
+  consumerScope           String          @default("all")
+  consumerMemberIds       String[]
+  estimatedDurationDays   Int
+  estimatedEndDate        DateTime
+  durationOverridden      Boolean         @default(false)
+  confidenceNote          String?
+  alertConfig             AlertConfig?
+  alertDeliveries         AlertDelivery[]
+  archivedAt              DateTime?
+  replacedById            String?
+  createdAt               DateTime        @default(now())
+  updatedAt               DateTime        @updatedAt
+
+  @@index([categoryId])
+  @@index([estimatedEndDate])
+}
+
+model AlertConfig {
+  id                    String  @id @default(cuid())
+  product               Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId             String  @unique
+  overrideThresholdDays Int?
+  emailEnabled          Boolean @default(true)
+}
+
+model AlertDelivery {
+  id        String   @id @default(cuid())
+  product   Product  @relation(fields: [productId], references: [id])
+  productId String
+  sentAt    DateTime @default(now())
+  channel   String
+  success   Boolean
+
+  @@index([productId])
+  @@index([sentAt])
+}
+
+model SystemSettings {
+  id                        String @id @default("singleton")
+  defaultAlertThresholdDays Int    @default(3)
+  digestEmailTime           String @default("08:00")
+  digestEmailAddress        String @default("")
+  timezone                  String @default("America/Sao_Paulo")
+}

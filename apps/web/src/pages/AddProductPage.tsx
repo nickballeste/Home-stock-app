@@ -1,0 +1,171 @@
+import { useState, type ChangeEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
+import type { ProductUnit } from '@homestock/types';
+import { useCategories, useCreateProduct, useExtractProductFromImage } from '../api/queries';
+import { Input, Select } from '../components/Input';
+import Button from '../components/Button';
+
+const UNITS: ProductUnit[] = ['ml', 'g', 'units', 'sheets', 'doses'];
+
+export default function AddProductPage() {
+  const nav = useNavigate();
+  const { data: categories = [] } = useCategories();
+  const createProduct = useCreateProduct();
+  const extract = useExtractProductFromImage();
+
+  const [name, setName] = useState('');
+  const [brand, setBrand] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [unit, setUnit] = useState<ProductUnit>('ml');
+  const [packageSize, setPackageSize] = useState<number>(0);
+  const [currentQuantity, setCurrentQuantity] = useState<number>(1);
+  const [extractError, setExtractError] = useState<string | null>(null);
+
+  function applyExtracted(data: {
+    name: string | null;
+    brand: string | null;
+    suggestedCategory: string | null;
+    unit: ProductUnit | null;
+    packageSize: number | null;
+  }) {
+    if (data.name) setName(data.name);
+    if (data.brand) setBrand(data.brand);
+    if (data.unit) setUnit(data.unit);
+    if (data.packageSize) setPackageSize(data.packageSize);
+    if (data.suggestedCategory) {
+      const match = categories.find(
+        (c) => c.name.toLowerCase() === data.suggestedCategory!.toLowerCase(),
+      );
+      if (match) setCategoryId(match.id);
+    }
+  }
+
+  async function handlePhoto(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setExtractError(null);
+    const mime = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+    const base64 = await fileToBase64(file);
+    try {
+      const result = await extract.mutateAsync({ imageBase64: base64, mimeType: mime });
+      applyExtracted(result);
+    } catch (err) {
+      setExtractError((err as Error).message);
+    }
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!categoryId) return;
+    const created = await createProduct.mutateAsync({
+      name,
+      brand: brand || null,
+      categoryId,
+      unit,
+      packageSize: Number(packageSize),
+      currentQuantity: Number(currentQuantity),
+    });
+    nav(`/products/${created.id}`);
+  }
+
+  return (
+    <div className="max-w-xl space-y-6">
+      <header>
+        <h1 className="text-2xl font-bold tracking-tight">Add product</h1>
+        <p className="text-sm text-slate-600">Upload a photo or fill the form manually.</p>
+      </header>
+
+      <div className="rounded-lg border border-dashed border-slate-300 bg-white p-4">
+        <label className="block text-sm font-medium mb-1">Photo (optional)</label>
+        <input type="file" accept="image/jpeg,image/png" onChange={handlePhoto} />
+        {extract.isPending && (
+          <p className="text-xs text-slate-500 mt-2">Extracting…</p>
+        )}
+        {extractError && <p className="text-xs text-rose-600 mt-2">{extractError}</p>}
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <Input
+          label="Name"
+          required
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <Input
+          label="Brand"
+          value={brand}
+          onChange={(e) => setBrand(e.target.value)}
+        />
+        <Select
+          label="Category"
+          required
+          value={categoryId}
+          onChange={(e) => setCategoryId(e.target.value)}
+        >
+          <option value="">Choose…</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </Select>
+        <div className="grid grid-cols-2 gap-4">
+          <Select
+            label="Unit"
+            value={unit}
+            onChange={(e) => setUnit(e.target.value as ProductUnit)}
+          >
+            {UNITS.map((u) => (
+              <option key={u} value={u}>{u}</option>
+            ))}
+          </Select>
+          <Input
+            label="Package size"
+            type="number"
+            min={0}
+            step="any"
+            required
+            value={packageSize}
+            onChange={(e) => setPackageSize(Number(e.target.value))}
+          />
+        </div>
+        <Input
+          label="Current quantity (packages)"
+          type="number"
+          min={0}
+          step="any"
+          required
+          value={currentQuantity}
+          onChange={(e) => setCurrentQuantity(Number(e.target.value))}
+          hint="How many packages you currently have."
+        />
+
+        <div className="flex gap-2 justify-end pt-2">
+          <Button type="button" variant="secondary" onClick={() => nav(-1)}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={createProduct.isPending}>
+            {createProduct.isPending ? 'Saving…' : 'Save'}
+          </Button>
+        </div>
+
+        {createProduct.isError && (
+          <p className="text-sm text-rose-600">
+            {(createProduct.error as Error).message}
+          </p>
+        )}
+      </form>
+    </div>
+  );
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result);
+      const idx = result.indexOf('base64,');
+      resolve(idx >= 0 ? result.slice(idx + 'base64,'.length) : result);
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}

@@ -1,0 +1,25 @@
+{
+  "name": "homestock",
+  "version": "1.0.0",
+  "private": true,
+  "description": "HomeStock — Household stock management with AI-driven duration inference",
+  "packageManager": "pnpm@9.0.0",
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "lint": "turbo lint",
+    "test": "turbo test",
+    "typecheck": "turbo typecheck",
+    "db:migrate": "pnpm --filter @homestock/api prisma migrate dev",
+    "db:generate": "pnpm --filter @homestock/api prisma generate",
+    "db:deploy": "pnpm --filter @homestock/api prisma migrate deploy"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}
