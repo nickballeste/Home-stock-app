@@ -8,9 +8,10 @@ import {
   useReplaceRoutine,
   useUpdateMember,
 } from '../api/queries';
-import { Input, Textarea } from '../components/Input';
+import { Textarea } from '../components/Input';
 import Button from '../components/Button';
 import RoutineEditor, { type EditableSlot } from '../components/RoutineEditor';
+import AvatarPicker from '../components/AvatarPicker';
 import type { DayOfWeek } from '@homestock/types';
 
 export default function MemberDetailPage() {
@@ -24,11 +25,15 @@ export default function MemberDetailPage() {
   const extract = useExtractRoutine();
 
   const [name, setName] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [prompt, setPrompt] = useState('');
   const [slots, setSlots] = useState<EditableSlot[]>([]);
 
   useEffect(() => {
-    if (member) setName(member.name);
+    if (member) {
+      setName(member.name);
+      setAvatarUrl(member.avatarUrl);
+    }
   }, [member]);
 
   useEffect(() => {
@@ -45,7 +50,7 @@ export default function MemberDetailPage() {
   }, [routine]);
 
   async function saveAll() {
-    await updateMember.mutateAsync({ name });
+    await updateMember.mutateAsync({ name, avatarUrl });
     await replaceRoutine.mutateAsync(
       slots.map((s) => ({
         dayOfWeek: s.dayOfWeek,
@@ -73,11 +78,16 @@ export default function MemberDetailPage() {
         <p className="text-sm text-slate-500">{member.weeklyPresenceHours}h/week at home</p>
       </header>
 
-      <Input
-        label="Name"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-      />
+      <AvatarPicker name={name} avatarUrl={avatarUrl} onChange={setAvatarUrl} />
+
+      <label className="block">
+        <span className="block text-sm font-medium text-slate-800 mb-1">Name</span>
+        <input
+          className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+      </label>
 
       <div className="space-y-2">
         <Textarea

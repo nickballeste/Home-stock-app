@@ -4,6 +4,7 @@ import type { ProductUnit } from '@homestock/types';
 import { useCategories, useCreateProduct, useExtractProductFromImage } from '../api/queries';
 import { Input, Select } from '../components/Input';
 import Button from '../components/Button';
+import CategoryPicker from '../components/CategoryPicker';
 
 const UNITS: ProductUnit[] = ['ml', 'g', 'units', 'sheets', 'doses'];
 
@@ -18,7 +19,10 @@ export default function AddProductPage() {
   const [categoryId, setCategoryId] = useState('');
   const [unit, setUnit] = useState<ProductUnit>('ml');
   const [packageSize, setPackageSize] = useState<number>(0);
-  const [currentQuantity, setCurrentQuantity] = useState<number>(1);
+  const [packages, setPackages] = useState<number>(1);
+  const [fillPercent, setFillPercent] = useState<number>(100);
+
+  const effectiveQuantity = packages <= 0 ? 0 : (packages - 1) + fillPercent / 100;
   const [extractError, setExtractError] = useState<string | null>(null);
 
   function applyExtracted(data: {
@@ -56,14 +60,13 @@ export default function AddProductPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!categoryId) return;
     const created = await createProduct.mutateAsync({
       name,
       brand: brand || null,
-      categoryId,
+      categoryId: categoryId || undefined,
       unit,
       packageSize: Number(packageSize),
-      currentQuantity: Number(currentQuantity),
+      currentQuantity: effectiveQuantity,
     });
     nav(`/products/${created.id}`);
   }
@@ -96,17 +99,11 @@ export default function AddProductPage() {
           value={brand}
           onChange={(e) => setBrand(e.target.value)}
         />
-        <Select
-          label="Category"
-          required
-          value={categoryId}
-          onChange={(e) => setCategoryId(e.target.value)}
-        >
-          <option value="">Choose…</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </Select>
+        <CategoryPicker
+          categories={categories}
+          selectedId={categoryId}
+          onSelect={setCategoryId}
+        />
         <div className="grid grid-cols-2 gap-4">
           <Select
             label="Unit"
@@ -127,16 +124,46 @@ export default function AddProductPage() {
             onChange={(e) => setPackageSize(Number(e.target.value))}
           />
         </div>
-        <Input
-          label="Current quantity (packages)"
-          type="number"
-          min={0}
-          step="any"
-          required
-          value={currentQuantity}
-          onChange={(e) => setCurrentQuantity(Number(e.target.value))}
-          hint="How many packages you currently have."
-        />
+        <div className="space-y-3">
+          <Input
+            label="Packages on hand"
+            type="number"
+            min={0}
+            step={1}
+            required
+            value={packages}
+            onChange={(e) => {
+              const n = Math.max(0, Math.floor(Number(e.target.value)));
+              if (n > packages) setFillPercent(100);
+              setPackages(n);
+            }}
+            hint="How many sealed/unopened packages you have (including the current one)."
+          />
+          {packages >= 1 && (
+            <label className="block">
+              <span className="block text-sm font-medium text-slate-800 mb-1">
+                Current package fill level —{' '}
+                <span className="text-indigo-600 font-semibold">{fillPercent}%</span>
+                <span className="text-slate-400 font-normal text-xs ml-2">
+                  ({effectiveQuantity.toFixed(2)} effective packages)
+                </span>
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={5}
+                value={fillPercent}
+                onChange={(e) => setFillPercent(Number(e.target.value))}
+                className="w-full accent-indigo-600"
+              />
+              <div className="flex justify-between text-xs text-slate-400 mt-0.5">
+                <span>Empty</span>
+                <span>Full</span>
+              </div>
+            </label>
+          )}
+        </div>
 
         <div className="flex gap-2 justify-end pt-2">
           <Button type="button" variant="secondary" onClick={() => nav(-1)}>

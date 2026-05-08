@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { AlertStatus } from '@homestock/types';
-import { useCategories, useProducts } from '../api/queries';
+import { useCategories, useMarkFinished, useProducts, useReInferAll } from '../api/queries';
 import StatusBadge from '../components/StatusBadge';
 import Button from '../components/Button';
 
@@ -9,6 +9,8 @@ export default function ProductsPage() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<AlertStatus | ''>('');
   const [categoryId, setCategoryId] = useState('');
+  const reInferAll = useReInferAll();
+  const markFinished = useMarkFinished();
 
   const { data: categories = [] } = useCategories();
   const { data: products = [], isLoading } = useProducts({
@@ -22,10 +24,25 @@ export default function ProductsPage() {
     <div className="space-y-6">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Products</h1>
-        <Link to="/products/new">
-          <Button>Add product</Button>
-        </Link>
+        <div className="flex gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => reInferAll.mutate()}
+            disabled={reInferAll.isPending}
+            title="Re-infer durations for all products (skips manually overridden)"
+          >
+            {reInferAll.isPending ? 'Re-inferring…' : 'Re-infer all durations'}
+          </Button>
+          <Link to="/products/new">
+            <Button>Add product</Button>
+          </Link>
+        </div>
       </header>
+      {reInferAll.isSuccess && (
+        <p className="text-xs text-emerald-700">
+          Done — {reInferAll.data.updated} updated, {reInferAll.data.skipped} skipped.
+        </p>
+      )}
 
       <div className="flex flex-wrap gap-2">
         <input
@@ -72,6 +89,7 @@ export default function ProductsPage() {
                 <th className="px-4 py-2 font-medium">Qty</th>
                 <th className="px-4 py-2 font-medium">Days left</th>
                 <th className="px-4 py-2 font-medium">Status</th>
+                <th className="px-4 py-2" />
               </tr>
             </thead>
             <tbody>
@@ -89,6 +107,19 @@ export default function ProductsPage() {
                   </td>
                   <td className="px-4 py-3">
                     <StatusBadge status={p.alertStatus} />
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {p.alertStatus !== 'overdue' && (
+                      <button
+                        type="button"
+                        title="Mark as finished — product is currently out of stock"
+                        disabled={markFinished.isPending}
+                        onClick={() => markFinished.mutate(p.id)}
+                        className="text-xs text-slate-400 hover:text-rose-600 transition-colors disabled:opacity-40"
+                      >
+                        Out of stock
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

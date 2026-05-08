@@ -1,20 +1,24 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useCreateMember, useExtractRoutine } from '../api/queries';
-import { Input, Textarea } from '../components/Input';
+import { useCreateMember, useExtractRoutine, useReInferAll } from '../api/queries';
+import { Textarea } from '../components/Input';
 import Button from '../components/Button';
 import RoutineEditor, { type EditableSlot } from '../components/RoutineEditor';
+import AvatarPicker from '../components/AvatarPicker';
+import Dialog from '../components/Dialog';
 
 export default function AddMemberPage() {
   const nav = useNavigate();
   const [name, setName] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [prompt, setPrompt] = useState('');
   const [slots, setSlots] = useState<EditableSlot[]>([]);
+  const [newMemberId, setNewMemberId] = useState<string | null>(null);
 
   const createMember = useCreateMember();
   const extract = useExtractRoutine();
+  const reInferAll = useReInferAll();
 
-  // Routine for an unsaved member uses a deferred replace after creation.
   const replaceRoutineForId = (id: string) =>
     fetch(`/api/v1/members/${id}/routine`, {
       method: 'PUT',
@@ -36,11 +40,18 @@ export default function AddMemberPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const member = await createMember.mutateAsync({ name });
-    if (slots.length > 0) {
-      await replaceRoutineForId(member.id);
-    }
-    nav(`/members/${member.id}`);
+    const member = await createMember.mutateAsync({ name, avatarUrl });
+    if (slots.length > 0) await replaceRoutineForId(member.id);
+    setNewMemberId(member.id);
+  }
+
+  async function handleReInferYes() {
+    await reInferAll.mutateAsync();
+    nav(`/members/${newMemberId}`);
+  }
+
+  function handleReInferNo() {
+    nav(`/members/${newMemberId}`);
   }
 
   return (
@@ -50,12 +61,17 @@ export default function AddMemberPage() {
       </header>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Input
-          label="Name"
-          required
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
+        <AvatarPicker name={name || 'New'} avatarUrl={avatarUrl} onChange={setAvatarUrl} />
+
+        <label className="block">
+          <span className="block text-sm font-medium text-slate-800 mb-1">Name</span>
+          <input
+            required
+            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </label>
 
         <div className="space-y-2">
           <Textarea
@@ -89,6 +105,18 @@ export default function AddMemberPage() {
           </Button>
         </div>
       </form>
+
+      {newMemberId && (
+        <Dialog
+          title="Re-infer product durations?"
+          message="Do you want to re-infer all product durations based on this new member's presence?"
+          confirmLabel="Yes, re-infer"
+          cancelLabel="Skip"
+          loading={reInferAll.isPending}
+          onConfirm={handleReInferYes}
+          onCancel={handleReInferNo}
+        />
+      )}
     </div>
   );
 }

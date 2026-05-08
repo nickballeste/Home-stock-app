@@ -24,6 +24,7 @@ import { SettingsServiceImpl } from './modules/settings/settings.service.js';
 
 import { categoriesRouter } from './modules/categories/categories.router.js';
 import { PrismaCategoriesRepository } from './modules/categories/categories.repository.js';
+import { authRouter } from './modules/auth/auth.router.js';
 
 export interface AppDependencies {
   ai?: AIService;
@@ -72,7 +73,10 @@ export function createApp(deps: AppDependencies = {}): Express {
     email,
   );
 
-  // ── Public routes (auth-gated) ────────────────────────────────
+  // ── Auth routes (public — no token required) ─────────────────
+  app.use('/api/v1/auth', authRouter(prisma));
+
+  // ── Protected routes ──────────────────────────────────────────
   const v1 = express.Router();
   v1.use(requireAuth);
   v1.use('/members', membersRouter(membersService));

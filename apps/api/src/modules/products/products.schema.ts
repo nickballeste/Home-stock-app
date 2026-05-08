@@ -6,7 +6,7 @@ const ScopeEnum = z.enum(['all', 'specific']);
 export const CreateProductSchema = z.object({
   name: z.string().min(1).max(120),
   brand: z.string().max(80).nullish(),
-  categoryId: z.string().min(1),
+  categoryId: z.string().min(1).optional(),
   unit: UnitEnum,
   packageSize: z.number().positive(),
   currentQuantity: z.number().nonnegative(),

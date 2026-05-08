@@ -89,6 +89,22 @@ export function productsRouter(service: ProductsService): Router {
     }),
   );
 
+  router.post(
+    '/:id/mark-finished',
+    asyncHandler(async (req, res) => {
+      const data = await service.markFinished(req.params.id!);
+      return ok(res, data);
+    }),
+  );
+
+  router.post(
+    '/re-infer-all',
+    asyncHandler(async (_req, res) => {
+      const data = await service.reInferAll();
+      return ok(res, data);
+    }),
+  );
+
   router.get(
     '/:id/alert-config',
     asyncHandler(async (req, res) => {

@@ -29,6 +29,8 @@ export interface ProductsService {
   replace(id: string, input: CreateProductDto): Promise<Product>;
   overrideDuration(id: string, input: DurationOverrideDto): Promise<Product>;
   reInferDuration(id: string): Promise<Product>;
+  reInferAll(): Promise<{ updated: number; skipped: number }>;
+  markFinished(id: string): Promise<Product>;
   updateAlertConfig(id: string, input: AlertConfigUpdateDto): Promise<Product>;
   computeAlertStatus(product: DbProductWithRelations, defaultThreshold: number, now?: Date): AlertStatus;
 }
@@ -87,12 +89,13 @@ export class ProductsServiceImpl implements ProductsService {
   }
 
   async create(input: CreateProductDto): Promise<Product> {
-    const inference = await this.resolveInitialDuration(input);
+    const categoryId = await this.resolveCategory(input.categoryId);
+    const inference = await this.resolveInitialDuration({ ...input, categoryId });
 
     const created = await this.repo.create({
       name: input.name,
       brand: input.brand ?? null,
-      categoryId: input.categoryId,
+      categoryId,
       unit: input.unit,
       packageSize: input.packageSize,
       currentQuantity: input.currentQuantity,
@@ -216,6 +219,35 @@ export class ProductsServiceImpl implements ProductsService {
     return this.toApiProduct(updated, settings.defaultAlertThresholdDays);
   }
 
+  async reInferAll(): Promise<{ updated: number; skipped: number }> {
+    const all = await this.repo.list({});
+    let updated = 0;
+    let skipped = 0;
+    for (const product of all) {
+      if (product.durationOverridden) { skipped++; continue; }
+      try {
+        await this.reInferDuration(product.id);
+        updated++;
+      } catch {
+        skipped++;
+      }
+    }
+    return { updated, skipped };
+  }
+
+  async markFinished(id: string): Promise<Product> {
+    const existing = await this.repo.findById(id);
+    if (!existing) throw new NotFoundError('PRODUCT_NOT_FOUND', `No product with id ${id}`);
+    const yesterday = addDays(startOfDay(new Date()), -1);
+    const updated = await this.repo.update(id, {
+      currentQuantity: 0,
+      estimatedEndDate: yesterday,
+      durationOverridden: true,
+    });
+    const settings = await this.settings.get();
+    return this.toApiProduct(updated, settings.defaultAlertThresholdDays);
+  }
+
   async updateAlertConfig(id: string, input: AlertConfigUpdateDto): Promise<Product> {
     const existing = await this.repo.findById(id);
     if (!existing) throw new NotFoundError('PRODUCT_NOT_FOUND', `No product with id ${id}`);
@@ -241,7 +273,7 @@ export class ProductsServiceImpl implements ProductsService {
 
   // ── Internals ────────────────────────────────────────────────
 
-  private async resolveInitialDuration(input: CreateProductDto) {
+  private async resolveInitialDuration(input: CreateProductDto & { categoryId: string }) {
     if (input.estimatedDurationDays !== undefined) {
       return {
         durationDays: input.estimatedDurationDays,
@@ -325,6 +357,12 @@ export class ProductsServiceImpl implements ProductsService {
 
     const totalHours = allMembers.reduce((sum, m) => sum + m.weeklyPresenceHours, 0);
     return { totalWeeklyPresenceHours: totalHours, memberCount: allMembers.length };
+  }
+
+  private async resolveCategory(categoryId: string | undefined): Promise<string> {
+    if (categoryId) return categoryId;
+    const cat = await this.categories.upsertByName('Uncategorized', 'box');
+    return cat.id;
   }
 
   private async resolveCategoryName(categoryId: string): Promise<string> {

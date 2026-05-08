@@ -167,10 +167,20 @@ export interface UpdateMemberInput {
   avatarUrl?: string | null;
 }
 
+export interface CreateCategoryInput {
+  name: string;
+  icon?: string;
+}
+
+export interface UpdateCategoryInput {
+  name?: string;
+  icon?: string;
+}
+
 export interface CreateProductInput {
   name: string;
   brand?: string | null;
-  categoryId: string;
+  categoryId?: string;
   unit: ProductUnit;
   packageSize: number;
   currentQuantity: number;

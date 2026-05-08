@@ -1,8 +1,10 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAlertSummary } from '../api/queries';
+import { useAuth } from '../auth/AuthContext';
 
 export default function Layout() {
   const { data: summary } = useAlertSummary();
+  const { user, logout } = useAuth();
   const alertCount = (summary?.totalAlerts ?? 0) + (summary?.totalOverdue ?? 0);
 
   const links: Array<{ to: string; label: string; badge?: number }> = [
@@ -20,7 +22,7 @@ export default function Layout() {
           <h1 className="text-lg font-bold tracking-tight">HomeStock</h1>
           <p className="text-xs text-slate-500">Always-on home stock</p>
         </div>
-        <nav className="px-2 md:px-4 pb-4 flex md:block gap-1 md:gap-2 overflow-x-auto">
+        <nav className="px-2 md:px-4 pb-2 flex md:block gap-1 md:gap-2 overflow-x-auto">
           {links.map((l) => (
             <NavLink
               key={l.to}
@@ -45,6 +47,19 @@ export default function Layout() {
             </NavLink>
           ))}
         </nav>
+
+        {user && (
+          <div className="px-4 md:px-6 pb-4 md:pb-6 border-t border-slate-100 pt-3 mt-1">
+            <p className="text-xs font-medium text-slate-700 truncate">{user.name}</p>
+            <p className="text-xs text-slate-400 truncate mb-2">{user.email}</p>
+            <button
+              onClick={logout}
+              className="text-xs text-slate-500 hover:text-rose-600 transition-colors"
+            >
+              Sign out
+            </button>
+          </div>
+        )}
       </aside>
 
       <main className="flex-1 px-4 md:px-8 py-6 md:py-10 max-w-5xl">

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   AlertSummary,
   Category,
+  CreateCategoryInput,
   CreateMemberInput,
   CreateProductInput,
   DurationOverrideInput,
@@ -13,6 +14,7 @@ import type {
   ProductSummary,
   RoutineSlot,
   SystemSettings,
+  UpdateCategoryInput,
   UpdateMemberInput,
   UpdateProductInput,
   UpdateSettingsInput,
@@ -137,9 +139,22 @@ export function useUpdateProduct(id: string) {
   return useMutation({
     mutationFn: (input: UpdateProductInput) =>
       api<Product>(`/products/${id}`, { method: 'PATCH', body: input }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['products'] });
+    onMutate: async (input) => {
+      await qc.cancelQueries({ queryKey: ['product', id] });
+      const previous = qc.getQueryData<Product>(['product', id]);
+      qc.setQueryData<Product>(['product', id], (old) =>
+        old ? { ...old, ...input } : old,
+      );
+      return { previous };
+    },
+    onError: (_err, _input, context) => {
+      if (context?.previous) {
+        qc.setQueryData(['product', id], context.previous);
+      }
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ['product', id] });
+      qc.invalidateQueries({ queryKey: ['products'] });
     },
   });
 }
@@ -191,12 +206,64 @@ export function useReInferDuration(id: string) {
   });
 }
 
+export function useMarkFinished() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api<Product>(`/products/${id}/mark-finished`, { method: 'POST' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['products'] });
+      qc.invalidateQueries({ queryKey: ['alert-summary'] });
+    },
+  });
+}
+
+export function useReInferAll() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api<{ updated: number; skipped: number }>('/products/re-infer-all', { method: 'POST' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['products'] });
+    },
+  });
+}
+
 // ── Categories ──────────────────────────────────────────────────
 
 export function useCategories() {
   return useQuery({
     queryKey: ['categories'],
     queryFn: () => api<Category[]>('/categories'),
+  });
+}
+
+export function useCreateCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateCategoryInput) =>
+      api<Category>('/categories', { method: 'POST', body: input }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['categories'] }),
+  });
+}
+
+export function useUpdateCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...input }: UpdateCategoryInput & { id: string }) =>
+      api<Category>(`/categories/${id}`, { method: 'PATCH', body: input }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['categories'] }),
+  });
+}
+
+export function useDeleteCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api<void>(`/categories/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['categories'] });
+      qc.invalidateQueries({ queryKey: ['products'] });
+    },
   });
 }
 
