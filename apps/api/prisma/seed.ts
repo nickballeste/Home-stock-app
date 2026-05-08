@@ -1,4 +1,12 @@
+import { config } from 'dotenv';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { PrismaClient } from '@prisma/client';
+
+// Load .env from the api package, then fall back to the monorepo root.
+const here = fileURLToPath(new URL('.', import.meta.url));
+config({ path: resolve(here, '../.env') });
+config({ path: resolve(here, '../../../.env') });
 
 const prisma = new PrismaClient();
 

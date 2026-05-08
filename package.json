@@ -12,7 +12,8 @@
     "typecheck": "turbo typecheck",
     "db:migrate": "pnpm --filter @homestock/api prisma migrate dev",
     "db:generate": "pnpm --filter @homestock/api prisma generate",
-    "db:deploy": "pnpm --filter @homestock/api prisma migrate deploy"
+    "db:deploy": "pnpm --filter @homestock/api prisma migrate deploy",
+    "db:seed": "pnpm --filter @homestock/api db:seed"
   },
   "devDependencies": {
     "turbo": "^2.0.0",
