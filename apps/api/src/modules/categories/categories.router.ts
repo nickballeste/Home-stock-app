@@ -39,10 +39,11 @@ export function categoriesRouter(prisma: PrismaClient): Router {
   router.patch(
     '/:id',
     asyncHandler(async (req, res) => {
+      const { id } = req.params as { id: string };
       const body = UpdateCategorySchema.parse(req.body);
-      const existing = await repo.findById(req.params.id);
+      const existing = await repo.findById(id);
       if (!existing) throw new NotFoundError('CATEGORY_NOT_FOUND', 'Category not found');
-      const cat = await repo.update(req.params.id, body);
+      const cat = await repo.update(id, body);
       return ok(res, cat);
     }),
   );
@@ -50,9 +51,10 @@ export function categoriesRouter(prisma: PrismaClient): Router {
   router.delete(
     '/:id',
     asyncHandler(async (req, res) => {
-      const existing = await repo.findById(req.params.id);
+      const { id } = req.params as { id: string };
+      const existing = await repo.findById(id);
       if (!existing) throw new NotFoundError('CATEGORY_NOT_FOUND', 'Category not found');
-      await repo.delete(req.params.id);
+      await repo.delete(id);
       return ok(res, null);
     }),
   );
