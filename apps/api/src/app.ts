@@ -25,6 +25,7 @@ import { SettingsServiceImpl } from './modules/settings/settings.service.js';
 import { categoriesRouter } from './modules/categories/categories.router.js';
 import { PrismaCategoriesRepository } from './modules/categories/categories.repository.js';
 import { authRouter } from './modules/auth/auth.router.js';
+import { systemProductsRouter } from './modules/system-products/system-products.router.js';
 
 export interface AppDependencies {
   ai?: AIService;
@@ -82,6 +83,7 @@ export function createApp(deps: AppDependencies = {}): Express {
   v1.use('/members', membersRouter(membersService));
   v1.use('/products', productsRouter(productsService));
   v1.use('/categories', categoriesRouter(prisma));
+  v1.use('/system-products', systemProductsRouter(prisma));
   v1.use('/ai', aiRouter(ai));
   v1.use('/alerts', alertsRouter(alertsService));
   v1.use('/settings', settingsRouter(settingsService));

@@ -31,3 +31,4 @@ apps/api/prisma/*.db-journal
 
 # vercel
 .vercel
+.env*

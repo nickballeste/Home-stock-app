@@ -47,12 +47,30 @@ model Category {
   products Product[]
 }
 
+model SystemProduct {
+  id                  String    @id @default(cuid())
+  name                String
+  brand               String?
+  categoryName        String
+  unit                String
+  commonPackageSize   Float
+  defaultDurationDays Int
+  tags                String[]
+  userProducts        Product[]
+
+  @@unique([name, categoryName])
+  @@index([name])
+  @@index([categoryName])
+}
+
 model Product {
   id                      String          @id @default(cuid())
   name                    String
   brand                   String?
   category                Category        @relation(fields: [categoryId], references: [id])
   categoryId              String
+  systemProduct           SystemProduct?  @relation(fields: [systemProductId], references: [id])
+  systemProductId         String?
   unit                    String
   packageSize             Float
   currentQuantity         Float
@@ -70,6 +88,7 @@ model Product {
   updatedAt               DateTime        @updatedAt
 
   @@index([categoryId])
+  @@index([systemProductId])
   @@index([estimatedEndDate])
 }
 
