@@ -32,18 +32,47 @@ homestock/
 └── turbo.json
 ```
 
-## Setup
+## Rodando localmente
+
+### Pré-requisitos
+
+- Node.js >= 20
+- pnpm >= 9 (`npm install -g pnpm`)
+- PostgreSQL local **ou** uma instância no [Supabase](https://supabase.com) (free tier)
+
+### Instalação
 
 ```bash
 pnpm install
-cp .env.example .env             # fill in real values
-pnpm db:generate
-pnpm db:migrate                  # creates tables locally
-pnpm --filter @homestock/api exec tsx prisma/seed.ts
+cp .env.example .env
+```
+
+Edite o `.env` com os valores reais. Para dev local com auth desabilitado, o mínimo é:
+
+```env
+DATABASE_URL="postgresql://user:password@host:6543/postgres?pgbouncer=true"
+DIRECT_URL="postgresql://user:password@host:5432/postgres"
+AUTH_DISABLED="true"
+```
+
+> **Supabase:** copie as URLs em *Settings → Database → Connection string* (porta 6543 para `DATABASE_URL`, porta 5432 para `DIRECT_URL`). Caracteres especiais na senha devem ser URL-encoded (`/` → `%2F`, `$` → `%24`, `+` → `%2B`).
+
+### Banco de dados
+
+```bash
+pnpm db:generate        # gera o Prisma Client
+pnpm db:migrate         # aplica as migrations
+pnpm --filter @homestock/api exec tsx prisma/seed.ts   # dados iniciais (opcional)
+```
+
+### Iniciar
+
+```bash
 pnpm dev
 ```
 
-Frontend on http://localhost:5173, API on http://localhost:3001 (proxied via Vite).
+- Frontend: http://localhost:5173
+- API: http://localhost:3001 (proxied via Vite em `/api`)
 
 ## Tests
 
@@ -78,11 +107,25 @@ Single-household. Three modes — pick one:
 
 Multi-tenancy is explicitly out of scope for v1.
 
-## Deployment (Vercel)
+## Deploy (Vercel + Supabase)
 
-1. Create a Supabase project, copy the **pooled** `DATABASE_URL` (port 6543).
-2. Set Vercel env vars:
-   - `DATABASE_URL`, `ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `DIGEST_FROM_EMAIL`
-   - `JWT_SECRET` (or `HOMESTOCK_API_KEYS`)
-3. `vercel.json` already wires the cron at 08:00 BRT (`0 11 * * *` UTC).
-4. The `CRON_SECRET` is set automatically by Vercel and verified by the digest endpoint.
+1. Crie um projeto no [Supabase](https://supabase.com) e copie as URLs de conexão em *Settings → Database*.
+2. Instale a Vercel CLI: `npm install -g vercel` e faça login com `vercel login`.
+3. Link o projeto: `vercel link`.
+4. Adicione as variáveis de ambiente no Vercel:
+   ```
+   vercel env add DATABASE_URL production   # URL pooled (porta 6543)
+   vercel env add DIRECT_URL production     # URL direct (porta 5432)
+   vercel env add JWT_SECRET production
+   vercel env add ANTHROPIC_API_KEY production
+   vercel env add RESEND_API_KEY production
+   vercel env add DIGEST_FROM_EMAIL production
+   vercel env add WEB_ORIGIN production     # ex: https://seu-app.vercel.app
+   ```
+5. Aplique as migrations no banco remoto:
+   ```bash
+   cd apps/api && npx prisma migrate deploy
+   ```
+6. Faça push no GitHub — o Vercel deploya automaticamente a cada commit.
+
+> O cron de alertas já está configurado em `vercel.json` para 08:00 BRT (`0 11 * * *` UTC). O `CRON_SECRET` é gerado automaticamente pelo Vercel.
