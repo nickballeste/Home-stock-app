@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { HHMM_REGEX } from '../../shared/presence.js';
 
 export const CreateMemberSchema = z.object({
   name: z.string().min(1).max(100),
@@ -12,8 +13,8 @@ export const UpdateMemberSchema = z.object({
 
 export const RoutineSlotSchema = z.object({
   dayOfWeek: z.number().int().min(0).max(6),
-  startTime: z.string().regex(/^\d{1,2}:\d{2}$/, 'startTime must be HH:MM'),
-  endTime: z.string().regex(/^\d{1,2}:\d{2}$/, 'endTime must be HH:MM'),
+  startTime: z.string().regex(HHMM_REGEX, 'startTime must be HH:MM (00:00–23:59)'),
+  endTime: z.string().regex(HHMM_REGEX, 'endTime must be HH:MM (00:00–23:59)'),
 });
 
 export const ReplaceRoutineSchema = z.object({

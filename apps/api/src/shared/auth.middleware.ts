@@ -23,16 +23,20 @@ declare global {
   }
 }
 
-const API_KEYS = (process.env.HOMESTOCK_API_KEYS ?? '')
-  .split(',')
-  .map((k) => k.trim())
-  .filter(Boolean);
+// Read lazily so dotenv (loaded by the entry point) is guaranteed to have run,
+// and so tests can vary the env per test case.
+function apiKeys(): string[] {
+  return (process.env.HOMESTOCK_API_KEYS ?? '')
+    .split(',')
+    .map((k) => k.trim())
+    .filter(Boolean);
+}
 
 export function requireAuth(req: Request, _res: Response, next: NextFunction): void {
   const auth = req.header('authorization') ?? '';
   const apiKey = req.header('x-api-key');
 
-  if (apiKey && API_KEYS.includes(apiKey)) {
+  if (apiKey && apiKeys().includes(apiKey)) {
     req.principal = { kind: 'api-key', subject: hashHint(apiKey) };
     return next();
   }
@@ -51,8 +55,9 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
     }
   }
 
-  // For v1 (single-user, single-household), allow unauthenticated when AUTH_DISABLED=true
-  if (process.env.AUTH_DISABLED === 'true') {
+  // Local-dev escape hatch. Never honored in production — forgetting to
+  // remove AUTH_DISABLED must not silently expose the household data.
+  if (process.env.AUTH_DISABLED === 'true' && process.env.NODE_ENV !== 'production') {
     req.principal = { kind: 'user', subject: 'local-dev' };
     return next();
   }

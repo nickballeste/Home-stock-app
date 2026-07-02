@@ -1,5 +1,9 @@
 import type { DayOfWeek } from '@homestock/types';
 
+// 00:00–23:59 only; rejects impossible times like "27:00" or "08:75"
+// that parseHHMM would otherwise silently drop (undercounting presence).
+export const HHMM_REGEX = /^([01]?\d|2[0-3]):[0-5]\d$/;
+
 interface SlotInput {
   dayOfWeek: DayOfWeek | number;
   startTime: string; // "HH:MM"

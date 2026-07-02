@@ -146,14 +146,18 @@ export class ProductsServiceImpl implements ProductsService {
       currentQuantity: newQuantity,
     };
 
-    // Only re-infer duration if the user has not overridden it.
-    if (!existing.durationOverridden) {
+    // Re-infer duration unless the user has overridden it. Restocking from
+    // empty (e.g. after "mark finished") always re-infers and clears the
+    // override — otherwise the end date would stay in the past forever.
+    const restockingFromEmpty = existing.currentQuantity === 0;
+    if (!existing.durationOverridden || restockingFromEmpty) {
       const inference = await this.inferDurationFor({ ...existing, currentQuantity: newQuantity });
       updateData = {
         ...updateData,
         estimatedDurationDays: inference.estimatedDurationDays,
         estimatedEndDate: new Date(inference.estimatedEndDate),
         confidenceNote: inference.confidenceNote,
+        ...(restockingFromEmpty ? { durationOverridden: false } : {}),
       };
     }
 

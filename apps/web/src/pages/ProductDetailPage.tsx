@@ -7,6 +7,7 @@ import {
   useProduct,
   useReInferDuration,
   useRestockProduct,
+  useUpdateAlertConfig,
   useUpdateProduct,
 } from '../api/queries';
 import StatusBadge from '../components/StatusBadge';
@@ -23,6 +24,7 @@ export default function ProductDetailPage() {
   const reInfer = useReInferDuration(id ?? '');
   const overrideDuration = useOverrideDuration(id ?? '');
   const updateProduct = useUpdateProduct(id ?? '');
+  const updateAlertConfig = useUpdateAlertConfig(id ?? '');
   const deleteProduct = useDeleteProduct();
   const [days, setDays] = useState<number | ''>('');
 
@@ -174,14 +176,9 @@ export default function ProductDetailPage() {
           value={product.alertConfig.overrideThresholdDays ?? ''}
           onChange={(e) => {
             const value = e.target.value === '' ? null : Number(e.target.value);
-            // Reuse updateProduct flow via a separate query would be cleaner;
-            // here we use the alert-config endpoint exposed via product update.
-            void fetch(`/api/v1/products/${product.id}/alert-config`, {
-              method: 'PATCH',
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({ overrideThresholdDays: value }),
-            }).then(() => window.location.reload());
+            updateAlertConfig.mutate({ overrideThresholdDays: value });
           }}
+          disabled={updateAlertConfig.isPending}
           hint="Leave default to use the system-wide threshold."
         >
           <option value="">Use default</option>
@@ -191,6 +188,15 @@ export default function ProductDetailPage() {
             </option>
           ))}
         </Select>
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={product.alertConfig.emailEnabled}
+            disabled={updateAlertConfig.isPending}
+            onChange={(e) => updateAlertConfig.mutate({ emailEnabled: e.target.checked })}
+          />
+          Include in daily email digest
+        </label>
       </section>
 
       <section className="rounded-lg border border-rose-200 bg-rose-50 p-6">

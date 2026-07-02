@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCreateMember, useExtractRoutine, useReInferAll } from '../api/queries';
+import { api } from '../api/client';
 import { Textarea } from '../components/Input';
 import Button from '../components/Button';
 import RoutineEditor, { type EditableSlot } from '../components/RoutineEditor';
@@ -19,17 +20,17 @@ export default function AddMemberPage() {
   const extract = useExtractRoutine();
   const reInferAll = useReInferAll();
 
+  // Uses the api client (not raw fetch) so the auth header is attached.
   const replaceRoutineForId = (id: string) =>
-    fetch(`/api/v1/members/${id}/routine`, {
+    api(`/members/${id}/routine`, {
       method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
+      body: {
         slots: slots.map((s) => ({
           dayOfWeek: s.dayOfWeek,
           startTime: s.startTime,
           endTime: s.endTime,
         })),
-      }),
+      },
     });
 
   async function handleExtract() {

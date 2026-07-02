@@ -42,7 +42,6 @@ export interface ProductsRepository {
     productId: string,
     data: { overrideThresholdDays?: number | null; emailEnabled?: boolean },
   ): Promise<DbAlertConfig>;
-  findActiveBefore(date: Date): Promise<DbProductWithRelations[]>;
 }
 
 export class PrismaProductsRepository implements ProductsRepository {
@@ -106,7 +105,12 @@ export class PrismaProductsRepository implements ProductsRepository {
   }
 
   async delete(id: string): Promise<void> {
-    await this.prisma.product.delete({ where: { id } });
+    // AlertDelivery's FK is ON DELETE RESTRICT — remove delivery log rows
+    // first or deleting any product that ever appeared in a digest fails.
+    await this.prisma.$transaction([
+      this.prisma.alertDelivery.deleteMany({ where: { productId: id } }),
+      this.prisma.product.delete({ where: { id } }),
+    ]);
   }
 
   async upsertAlertConfig(
@@ -129,14 +133,4 @@ export class PrismaProductsRepository implements ProductsRepository {
     });
   }
 
-  findActiveBefore(date: Date): Promise<DbProductWithRelations[]> {
-    return this.prisma.product.findMany({
-      where: {
-        archivedAt: null,
-        estimatedEndDate: { lte: date },
-      },
-      include: { category: true, alertConfig: true },
-      orderBy: { estimatedEndDate: 'asc' },
-    });
-  }
 }

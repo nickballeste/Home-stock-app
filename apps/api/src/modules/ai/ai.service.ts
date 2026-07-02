@@ -9,7 +9,7 @@ import type {
 } from '@homestock/types';
 import { AIServiceError } from '../../shared/errors.js';
 import { addDays } from '../../shared/dates.js';
-import { computeWeeklyPresenceHours } from '../../shared/presence.js';
+import { computeWeeklyPresenceHours, HHMM_REGEX } from '../../shared/presence.js';
 import { EXTRACT_ROUTINE_SYSTEM, buildExtractRoutineUser } from './prompts/extract-routine.js';
 import { INFER_DURATION_SYSTEM, buildInferDurationUser } from './prompts/infer-duration.js';
 import { EXTRACT_PRODUCT_SYSTEM } from './prompts/extract-product.js';
@@ -27,8 +27,8 @@ export interface AIService {
 
 const RoutineSlotSchema = z.object({
   dayOfWeek: z.number().int().min(0).max(6),
-  startTime: z.string().regex(/^\d{1,2}:\d{2}$/),
-  endTime: z.string().regex(/^\d{1,2}:\d{2}$/),
+  startTime: z.string().regex(HHMM_REGEX),
+  endTime: z.string().regex(HHMM_REGEX),
 });
 
 const ExtractRoutineSchema = z.object({
@@ -48,16 +48,28 @@ const ExtractProductSchema = z.object({
   packageSize: z.number().positive().nullable(),
 });
 
-const MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-6';
+function model(): string {
+  return process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-5';
+}
 
 export class AnthropicAIService implements AIService {
-  private readonly client: Anthropic;
+  // Created lazily on first AI call so the app can boot (and every non-AI
+  // endpoint keeps working) without ANTHROPIC_API_KEY configured.
+  private client: Anthropic | null = null;
+  private readonly apiKey: string | undefined;
 
-  constructor(apiKey = process.env.ANTHROPIC_API_KEY) {
-    if (!apiKey) {
+  constructor(apiKey?: string) {
+    this.apiKey = apiKey;
+  }
+
+  private getClient(): Anthropic {
+    if (this.client) return this.client;
+    const key = this.apiKey ?? process.env.ANTHROPIC_API_KEY;
+    if (!key) {
       throw new AIServiceError('ANTHROPIC_API_KEY is not configured');
     }
-    this.client = new Anthropic({ apiKey });
+    this.client = new Anthropic({ apiKey: key });
+    return this.client;
   }
 
   async extractRoutineFromPrompt(prompt: string): Promise<ExtractedRoutine> {
@@ -103,8 +115,8 @@ export class AnthropicAIService implements AIService {
     imageBase64: string,
     mimeType: 'image/jpeg' | 'image/png',
   ): Promise<ExtractedProduct> {
-    const message = await this.client.messages.create({
-      model: MODEL,
+    const message = await this.getClient().messages.create({
+      model: model(),
       max_tokens: 512,
       system: EXTRACT_PRODUCT_SYSTEM,
       messages: [
@@ -137,8 +149,8 @@ export class AnthropicAIService implements AIService {
   }
 
   private async completeText(args: { system: string; user: string }): Promise<string> {
-    const message = await this.client.messages.create({
-      model: MODEL,
+    const message = await this.getClient().messages.create({
+      model: model(),
       max_tokens: 512,
       system: args.system,
       messages: [{ role: 'user', content: args.user }],

@@ -18,7 +18,7 @@ export default function AddProductPage() {
   const [brand, setBrand] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [unit, setUnit] = useState<ProductUnit>('ml');
-  const [packageSize, setPackageSize] = useState<number>(0);
+  const [packageSize, setPackageSize] = useState<number | ''>('');
   const [packages, setPackages] = useState<number>(1);
   const [fillPercent, setFillPercent] = useState<number>(100);
 
@@ -60,6 +60,7 @@ export default function AddProductPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (packageSize === '' || Number(packageSize) <= 0) return;
     const created = await createProduct.mutateAsync({
       name,
       brand: brand || null,
@@ -117,11 +118,13 @@ export default function AddProductPage() {
           <Input
             label="Package size"
             type="number"
-            min={0}
+            min={0.001}
             step="any"
             required
             value={packageSize}
-            onChange={(e) => setPackageSize(Number(e.target.value))}
+            onChange={(e) =>
+              setPackageSize(e.target.value === '' ? '' : Number(e.target.value))
+            }
           />
         </div>
         <div className="space-y-3">

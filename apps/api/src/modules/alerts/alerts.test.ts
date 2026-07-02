@@ -14,6 +14,7 @@ function makeProduct(overrides: Partial<DbProductWithRelations> = {}): DbProduct
     name: 'Shampoo',
     brand: null,
     categoryId: 'c1',
+    systemProductId: null,
     unit: 'ml',
     packageSize: 400,
     currentQuantity: 1,
@@ -41,7 +42,6 @@ function makeSetup(products: DbProductWithRelations[], opts: { recentDeliveries?
     update: vi.fn(),
     delete: vi.fn(),
     upsertAlertConfig: vi.fn(),
-    findActiveBefore: vi.fn().mockResolvedValue(products),
   };
 
   const productsService: ProductsService = {
@@ -54,11 +54,15 @@ function makeSetup(products: DbProductWithRelations[], opts: { recentDeliveries?
     replace: vi.fn(),
     overrideDuration: vi.fn(),
     reInferDuration: vi.fn(),
+    reInferAll: vi.fn(),
+    markFinished: vi.fn(),
     updateAlertConfig: vi.fn(),
-    computeAlertStatus: (p, threshold, now = NOW) => {
+    // Mirrors the real implementation, including per-product overrides.
+    computeAlertStatus: (p, defaultThreshold, now = NOW) => {
       const today = startOfDay(now);
       const end = startOfDay(p.estimatedEndDate);
       if (end.getTime() < today.getTime()) return 'overdue';
+      const threshold = p.alertConfig?.overrideThresholdDays ?? defaultThreshold;
       if (end.getTime() <= addDays(today, threshold).getTime()) return 'alert';
       return 'ok';
     },
@@ -124,33 +128,9 @@ describe('AlertsService', () => {
 
   describe('runDigest', () => {
     it('does nothing when no products are in alert', async () => {
-      const repo: ProductsRepository = {
-        list: vi.fn().mockResolvedValue([]),
-        findById: vi.fn(),
-        create: vi.fn(),
-        update: vi.fn(),
-        delete: vi.fn(),
-        upsertAlertConfig: vi.fn(),
-        findActiveBefore: vi.fn().mockResolvedValue([]),
-      };
-      const { email } = makeSetup([]);
-      const settings: SettingsService = {
-        get: vi.fn().mockResolvedValue({
-          id: 'singleton',
-          defaultAlertThresholdDays: 3,
-          digestEmailTime: '08:00',
-          digestEmailAddress: 'home@example.com',
-          timezone: 'UTC',
-        }),
-        update: vi.fn(),
-      };
-      const svc = new AlertsServiceImpl(
-        { alertDelivery: { findMany: vi.fn(), createMany: vi.fn() } } as never,
-        repo,
-        {} as ProductsService,
-        settings,
-        email,
-      );
+      const { svc, email } = makeSetup([
+        makeProduct({ id: 'a', estimatedEndDate: addDays(NOW, 30) }), // ok
+      ]);
       const result = await svc.runDigest();
       expect(result.sent).toBe(0);
       expect(email.send).not.toHaveBeenCalled();
@@ -182,6 +162,26 @@ describe('AlertsService', () => {
       const result = await svc.runDigest();
       expect(result.sent).toBe(0);
       expect(email.send).not.toHaveBeenCalled();
+    });
+
+    it('includes products in alert only via their per-product threshold override', async () => {
+      // Ends in 5 days: outside the default 3-day threshold, but inside
+      // this product's 7-day override — the digest must include it.
+      const products = [
+        makeProduct({
+          id: 'a',
+          estimatedEndDate: addDays(NOW, 5),
+          alertConfig: { id: 'a', productId: 'a', overrideThresholdDays: 7, emailEnabled: true },
+        }),
+        makeProduct({ id: 'b', estimatedEndDate: addDays(NOW, 5) }), // default threshold → ok
+      ];
+      const { svc, email, prisma } = makeSetup(products);
+      const result = await svc.runDigest();
+      expect(result.sent).toBe(1);
+      expect(email.send).toHaveBeenCalledTimes(1);
+      const created = (prisma as { alertDelivery: { createMany: ReturnType<typeof vi.fn> } })
+        .alertDelivery.createMany.mock.calls[0]![0].data as Array<{ productId: string }>;
+      expect(created.map((c) => c.productId)).toEqual(['a']);
     });
   });
 });

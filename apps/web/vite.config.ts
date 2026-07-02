@@ -18,6 +18,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    host: true, // bind to LAN so phones on the same network can open the app
     proxy: {
       '/api': {
         target: 'http://localhost:3001',

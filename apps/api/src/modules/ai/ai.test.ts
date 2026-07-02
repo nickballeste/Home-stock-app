@@ -4,14 +4,14 @@ import { AIServiceError } from '../../shared/errors.js';
 
 function makeServiceWithResponse(text: string) {
   const svc = new AnthropicAIService('sk-test');
-  // @ts-expect-error — overriding private client for test
-  svc.client = {
+  const fakeClient = {
     messages: {
       create: vi.fn().mockResolvedValue({
         content: [{ type: 'text', text }],
       }),
     },
   };
+  (svc as unknown as { client: unknown }).client = fakeClient;
   return svc;
 }
 

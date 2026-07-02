@@ -62,7 +62,7 @@ AUTH_DISABLED="true"
 ```bash
 pnpm db:generate        # gera o Prisma Client
 pnpm db:migrate         # aplica as migrations
-pnpm --filter @homestock/api exec tsx prisma/seed.ts   # dados iniciais (opcional)
+pnpm db:seed            # categorias + catálogo de produtos (recomendado)
 ```
 
 ### Iniciar
@@ -74,11 +74,18 @@ pnpm dev
 - Frontend: http://localhost:5173
 - API: http://localhost:3001 (proxied via Vite em `/api`)
 
+O Vite está configurado com `host: true`, então dá para abrir o app no celular
+(mesma rede Wi-Fi) via `http://<IP-da-sua-máquina>:5173`.
+
+> Sem `ANTHROPIC_API_KEY` o servidor sobe normalmente — só os recursos de IA
+> (inferência de duração, extração de rotina, importação por foto) retornam erro.
+
 ## Tests
 
 ```bash
-pnpm test                        # all tests
-pnpm --filter @homestock/api test
+pnpm test                            # all packages (turbo)
+pnpm --filter @homestock/api test    # API: services, auth, alerts, AI parsing
+pnpm --filter @homestock/web test    # Web: API client (envelope, auth, 401 handling)
 ```
 
 ## API surface
@@ -99,11 +106,17 @@ channel-specific logic in the backend.
 
 ## Auth (v1)
 
-Single-household. Three modes — pick one:
+Single-household, with real accounts (email + password, JWT):
 
-- `AUTH_DISABLED=true` — open access (default for local dev).
-- `JWT_SECRET=...` — Bearer JWT for the web app.
-- `HOMESTOCK_API_KEYS=key1,key2` — comma-separated static API keys for external clients (e.g. WhatsApp agent), passed via `X-API-Key`.
+- **Signup**: the **first** account created becomes the household owner; after
+  that, signups are closed (`SIGNUPS_CLOSED`). Set `ALLOW_SIGNUPS=true` to let
+  more people (e.g. a partner) create accounts.
+- `AUTH_DISABLED=true` — bypasses login for local dev. **Ignored in production**
+  (`NODE_ENV=production`), so forgetting it set is not a security hole.
+- `HOMESTOCK_API_KEYS=key1,key2` — static API keys for external clients
+  (e.g. WhatsApp agent), passed via the `X-API-Key` header.
+- Expired/invalid sessions are detected client-side (401 → automatic logout and
+  redirect to `/login`).
 
 Multi-tenancy is explicitly out of scope for v1.
 
@@ -128,4 +141,10 @@ Multi-tenancy is explicitly out of scope for v1.
    ```
 6. Faça push no GitHub — o Vercel deploya automaticamente a cada commit.
 
-> O cron de alertas já está configurado em `vercel.json` para 08:00 BRT (`0 11 * * *` UTC). O `CRON_SECRET` é gerado automaticamente pelo Vercel.
+> O cron de alertas já está configurado em `vercel.json` para 08:00 BRT (`0 11 * * *` UTC).
+> O Vercel invoca o endpoint com **GET** e autentica com o header `Authorization: Bearer $CRON_SECRET` — o `CRON_SECRET` é gerado automaticamente pelo Vercel.
+> O SPA fallback (`/products`, `/members` etc. → `index.html`) também já está no `vercel.json`.
+
+> **Nota:** a função serverless (`api/index.ts`) importa o app direto do código-fonte TypeScript
+> (`apps/api/src`). O esbuild do `@vercel/node` resolve imports `.js → .ts` normalmente, mas se o
+> build da função falhar no deploy, esse é o primeiro lugar para investigar.

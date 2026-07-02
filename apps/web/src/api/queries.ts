@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
+  AlertConfig,
+  AlertConfigInput,
   AlertSummary,
   Category,
   CreateCategoryInput,
@@ -130,6 +132,7 @@ export function useCreateProduct() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['products'] });
       qc.invalidateQueries({ queryKey: ['alert-summary'] });
+      qc.invalidateQueries({ queryKey: ['alerts'] });
     },
   });
 }
@@ -155,6 +158,8 @@ export function useUpdateProduct(id: string) {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['product', id] });
       qc.invalidateQueries({ queryKey: ['products'] });
+      qc.invalidateQueries({ queryKey: ['alert-summary'] });
+      qc.invalidateQueries({ queryKey: ['alerts'] });
     },
   });
 }
@@ -168,6 +173,7 @@ export function useRestockProduct() {
       qc.invalidateQueries({ queryKey: ['products'] });
       qc.invalidateQueries({ queryKey: ['product', id] });
       qc.invalidateQueries({ queryKey: ['alert-summary'] });
+      qc.invalidateQueries({ queryKey: ['alerts'] });
     },
   });
 }
@@ -178,6 +184,8 @@ export function useDeleteProduct() {
     mutationFn: (id: string) => api<void>(`/products/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['products'] });
+      qc.invalidateQueries({ queryKey: ['alert-summary'] });
+      qc.invalidateQueries({ queryKey: ['alerts'] });
     },
   });
 }
@@ -190,6 +198,8 @@ export function useOverrideDuration(id: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['product', id] });
       qc.invalidateQueries({ queryKey: ['products'] });
+      qc.invalidateQueries({ queryKey: ['alert-summary'] });
+      qc.invalidateQueries({ queryKey: ['alerts'] });
     },
   });
 }
@@ -202,6 +212,22 @@ export function useReInferDuration(id: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['product', id] });
       qc.invalidateQueries({ queryKey: ['products'] });
+      qc.invalidateQueries({ queryKey: ['alert-summary'] });
+      qc.invalidateQueries({ queryKey: ['alerts'] });
+    },
+  });
+}
+
+export function useUpdateAlertConfig(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: AlertConfigInput) =>
+      api<AlertConfig>(`/products/${id}/alert-config`, { method: 'PATCH', body: input }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['product', id] });
+      qc.invalidateQueries({ queryKey: ['products'] });
+      qc.invalidateQueries({ queryKey: ['alert-summary'] });
+      qc.invalidateQueries({ queryKey: ['alerts'] });
     },
   });
 }
@@ -214,6 +240,7 @@ export function useMarkFinished() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['products'] });
       qc.invalidateQueries({ queryKey: ['alert-summary'] });
+      qc.invalidateQueries({ queryKey: ['alerts'] });
     },
   });
 }
@@ -225,6 +252,8 @@ export function useReInferAll() {
       api<{ updated: number; skipped: number }>('/products/re-infer-all', { method: 'POST' }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['products'] });
+      qc.invalidateQueries({ queryKey: ['alert-summary'] });
+      qc.invalidateQueries({ queryKey: ['alerts'] });
     },
   });
 }

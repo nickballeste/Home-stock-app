@@ -46,6 +46,15 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
   const json = await res.json().catch(() => null);
 
   if (!res.ok) {
+    // Expired/invalid session: clear it and send the user to login.
+    // Auth endpoints are excluded — a failed login is not a session expiry.
+    if (res.status === 401 && !path.startsWith('/auth')) {
+      localStorage.removeItem('homestock_token');
+      localStorage.removeItem('homestock_user');
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.assign('/login');
+      }
+    }
     const err = json?.error ?? { code: 'UNKNOWN', message: res.statusText };
     throw new ApiError(res.status, err.code, err.message, err.field);
   }

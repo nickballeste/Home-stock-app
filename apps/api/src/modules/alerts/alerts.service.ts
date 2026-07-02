@@ -1,6 +1,6 @@
 import type { PrismaClient } from '@prisma/client';
 import type { AlertStatus, ProductSummary, AlertSummary, ProductUnit } from '@homestock/types';
-import { addDays, diffInDays, startOfDay } from '../../shared/dates.js';
+import { diffInDays, startOfDay } from '../../shared/dates.js';
 import type { ProductsService } from '../products/products.service.js';
 import type { ProductsRepository, DbProductWithRelations } from '../products/products.repository.js';
 import type { SettingsService } from '../settings/settings.service.js';
@@ -59,9 +59,18 @@ export class AlertsServiceImpl implements AlertsService {
   async runDigest(now: Date = new Date()): Promise<{ sent: number; recipients: string }> {
     const settings = await this.settings.get();
     const today = startOfDay(now);
-    const cutoff = addDays(today, settings.defaultAlertThresholdDays);
 
-    const candidates = await this.productsRepo.findActiveBefore(cutoff);
+    // Evaluate every product through computeAlertStatus so per-product
+    // threshold overrides are honored, not just the system default.
+    const all = await this.productsRepo.list({});
+    const candidates = all.filter((p) => {
+      const status = this.products.computeAlertStatus(
+        p,
+        settings.defaultAlertThresholdDays,
+        now,
+      );
+      return status === 'alert' || status === 'overdue';
+    });
 
     if (candidates.length === 0) {
       return { sent: 0, recipients: settings.digestEmailAddress };

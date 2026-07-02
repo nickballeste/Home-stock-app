@@ -27,16 +27,16 @@ export function alertsRouter(service: AlertsService): Router {
 
 /**
  * Internal cron-only routes (mounted separately, behind requireCronSecret).
+ * Vercel Cron invokes the path with a GET request, so both GET and POST
+ * are accepted.
  */
 export function alertsInternalRouter(service: AlertsService): Router {
   const router = Router();
-  router.post(
-    '/digest',
-    requireCronSecret,
-    asyncHandler(async (_req, res) => {
-      const result = await service.runDigest();
-      return ok(res, result);
-    }),
-  );
+  const handler = asyncHandler(async (_req, res) => {
+    const result = await service.runDigest();
+    return ok(res, result);
+  });
+  router.get('/digest', requireCronSecret, handler);
+  router.post('/digest', requireCronSecret, handler);
   return router;
 }

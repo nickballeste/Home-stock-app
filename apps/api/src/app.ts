@@ -77,8 +77,13 @@ export function createApp(deps: AppDependencies = {}): Express {
   // ── Auth routes (public — no token required) ─────────────────
   app.use('/api/v1/auth', authRouter(prisma));
 
-  // ── Protected routes ──────────────────────────────────────────
   const v1 = express.Router();
+
+  // ── Internal routes (cron-secret gated, NOT behind user auth —
+  //    Vercel Cron authenticates with CRON_SECRET only) ──────────
+  v1.use('/internal/alerts', alertsInternalRouter(alertsService));
+
+  // ── Protected routes ──────────────────────────────────────────
   v1.use(requireAuth);
   v1.use('/members', membersRouter(membersService));
   v1.use('/products', productsRouter(productsService));
@@ -88,10 +93,15 @@ export function createApp(deps: AppDependencies = {}): Express {
   v1.use('/alerts', alertsRouter(alertsService));
   v1.use('/settings', settingsRouter(settingsService));
 
-  // ── Internal routes (cron-secret gated) ───────────────────────
-  v1.use('/internal/alerts', alertsInternalRouter(alertsService));
-
   app.use('/api/v1', v1);
+
+  // Unknown API routes get a JSON envelope, not Express's HTML 404.
+  app.use('/api', (_req, res) => {
+    res.status(404).json({
+      error: { code: 'NOT_FOUND', message: 'No such API route' },
+    });
+  });
+
   app.use(errorHandler);
 
   return app;
